@@ -74,6 +74,28 @@ function maskEmailReg(email) {
     });
 }
 
+async function waitTurnstileComplete(page, timeout = 5) {
+    try {
+        await page.waitForFunction(() => {
+            const inputs = document.querySelectorAll("input[name='cf-turnstile-response']");
+            for (const input of inputs) {
+                if (input.value && input.value.length > 20) {
+                    return true;
+                }
+            }
+            return false;
+        }, {
+            timeout: timeout * 1000, // 转换为毫秒
+            polling: 500             // 轮询间隔，单位毫秒
+        });
+        console.log(`✅ Token 已获取`);
+        return true;
+    } catch (e) {
+        // console.warn(`⚠️ Token 获取超时或失败: ${e.message}`);
+        return false;
+    }
+}
+
 function getUsers() {
     try {
         if (process.env.USERS_JSON) {
@@ -564,9 +586,15 @@ async function sendTelegramNotification(summaryText) {
             await page.getByRole('textbox', { name: 'Password' }).fill(user.password);
 
             console.log('正在检查二次验证...');
-            for (let j = 0; j < 5; j++) {
-                if (await attemptTurnstileCdp(page)) await page.waitForTimeout(2000);
-                await page.waitForTimeout(500);
+            for (let j = 0; j < 15; j++) {
+                let clicked = await attemptTurnstileCdp(page);
+                if(!clicked) {
+                    await page.waitForTimeout(2000);
+                    continue;
+                }
+                if (await waitTurnstileComplete(page)) {
+                    break;
+                }
             }
 
             console.log('正在点击登录...');
