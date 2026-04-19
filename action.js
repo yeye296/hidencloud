@@ -15,7 +15,7 @@ const os = require('os');
 // Enable stealth plugin
 chromium.use(stealth);
 
-const RENEW_DAYS = 10;
+const RENEW_DAYS = 7;
 const INJECTED_SCRIPT = `
 (function() {
     if (window.self === window.top) return;
@@ -206,6 +206,27 @@ class HidenCloudBot {
             const manageRes = await this.request('GET', `/service/${service.id}/manage`);
             const $ = cheerio.load(manageRes.data);
             const formToken = $('input[name="_token"]').val();
+
+            // ================== 新增：检测是否允许续期 ==================
+            const renewBtn = $('button[onclick*="showRenewAlert"]');
+            if (renewBtn.length === 0) {
+                throw new Error("❌ 未找到续期按钮，无法继续。");
+            }
+            const onclickVal = renewBtn.attr('onclick');
+            const match = onclickVal.match(/showRenewAlert\((\d+),\s*(\d+),\s*(true|false)\)/);
+            if (!match) { throw new Error("❌ 无法从按钮属性中解析续期参数。"); }
+            const daysUntil = parseInt(match[1], 10);
+            const threshold = parseInt(match[2], 10);
+            const isFree = match[3] === 'true';
+
+            // 判断是否满足续期条件 (daysUntil <= threshold)，
+            if (daysUntil > threshold) {
+                const thresholdText = (threshold === 1) ? "1 day" : `${threshold} days`;
+                const kind = isFree ? "免费服务" : "服务";
+                this.log(`⏳ 暂未到达续期时间: ${kind}剩余时间低于 ${thresholdText} 才可续期。当前剩余: ${daysUntil} 天。`);
+                return;
+            }
+            this.log("✅ 已到达续期时间，开始执行续期操作...");
 
             this.log(`📅 提交续期 (${RENEW_DAYS}天)...`);
             await sleep(1000, 2000);
