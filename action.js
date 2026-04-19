@@ -68,6 +68,12 @@ const sleep = (min = 3000, max = 8000) => {
     return new Promise(resolve => setTimeout(resolve, delay));
 };
 
+function maskEmailReg(email) {
+    return email.replace(/^(.)(.*)(.)(@.*)$/, (match, first, middle, last, domain) => {
+        return first + "****" + last + domain;
+    });
+}
+
 function getUsers() {
     try {
         if (process.env.USERS_JSON) {
@@ -102,7 +108,7 @@ class HidenCloudBot {
     }
 
     log(msg) {
-        console.log(`[${this.username}] ${msg}`);
+        console.log(`[${maskEmailReg(this.username)}] ${msg}`);
         this.logMsg.push(msg);
     }
 
@@ -485,7 +491,7 @@ async function sendTelegramNotification(summaryText) {
 
     for (let i = 0; i < users.length; i++) {
         const user = users[i];
-        console.log(`\n=== 正在处理用户 ${i + 1}: ${user.username} ===`);
+        console.log(`\n=== 正在处理用户 ${i + 1}: ${maskEmailReg(user.username)} ===`);
 
         // 1. Prepare Isolated Environment
         let browser;
@@ -504,7 +510,7 @@ async function sendTelegramNotification(summaryText) {
                 } catch (e) { }
             }
 
-            console.log(`正在启动 Chrome (隔离用户 ${user.username})...`);
+            console.log(`正在启动 Chrome (隔离用户 ${maskEmailReg(user.username)})...`);
             const userDataDir = path.join(os.tmpdir(), `chrome_${Date.now()}_${i}`);
             const args = [
                 `--remote-debugging-port=${DEBUG_PORT}`,
@@ -590,17 +596,17 @@ async function sendTelegramNotification(summaryText) {
                         for (const svc of bot.services) {
                             await bot.processService(svc);
                         }
-                        summary.push({ user: user.username, status: 'Success', services: bot.services.length });
+                        summary.push({ user: maskEmailReg(user.username), status: 'Success', services: bot.services.length });
                     } else {
-                        summary.push({ user: user.username, status: 'Failed (API Init)', services: 0 });
+                        summary.push({ user: maskEmailReg(user.username), status: 'Failed (API Init)', services: 0 });
                     }
                 }
             } else {
-                summary.push({ user: user.username, status: 'Failed (Login)', services: 0 });
+                summary.push({ user: maskEmailReg(user.username), status: 'Failed (Login)', services: 0 });
             }
 
         } catch (err) {
-            console.error(`处理用户 ${user.username} 时出错: ${err.message}`);
+            console.error(`处理用户 ${maskEmailReg(user.username)} 时出错: ${err.message}`);
             if (page) await page.screenshot({ path: `error_process_${i}.png` }).catch(() => { });
         } finally {
             // Cleanup Everything for this user
